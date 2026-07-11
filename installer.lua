@@ -3,9 +3,7 @@
 --  Запускается через: wget run <ссылка на installer.lua с GitHub>
 -- ============================================
 
--- !!! ЗАМЕНИ ЭТУ ССЫЛКУ на свой репозиторий на GitHub !!!
--- Формат: https://raw.githubusercontent.com/<юзер>/<репо>/<ветка>/
-local REPO_BASE = "https://raw.githubusercontent.com/USERNAME/REPO/main/"
+local REPO_BASE = "https://raw.githubusercontent.com/Volodymyr538/OS/main/"
 
 local FILES_TO_DOWNLOAD = {
     { url = REPO_BASE .. "os/startup.lua",           path = "/os/startup.lua" },
@@ -195,14 +193,12 @@ header("Установка MoldOS")
 
 progressStep("Подготовка системы...", 5, 0.6)
 
--- создаём структуру папок
 if not fs.exists("/os") then fs.makeDir("/os") end
 if not fs.exists("/os/apps") then fs.makeDir("/os/apps") end
 if not fs.exists("/os/data") then fs.makeDir("/os/data") end
 
 progressStep("Сохранение настроек...", 8, 0.6)
 
--- сохраняем конфиг системы
 local config = {
     language = language,
     country = country,
@@ -216,7 +212,6 @@ cfgFile.close()
 
 progressStep("Создание учётной записи...", 14, 0.8)
 
--- сохраняем профиль (пароль хранится как есть в локальном файле)
 local users = {}
 users[username] = { password = password }
 local usersFile = fs.open("/os/data/users.lua", "w")
