@@ -39,41 +39,33 @@ local function header(title)
     term.setCursorPos(1, 5)
 end
 
-local function waitKey(msg)
+local function waitClick(msg)
     local _, h = term.getSize()
     term.setCursorPos(1, h)
-    term.write(msg or "Press any key...")
-    os.pullEvent("key")
+    term.write(msg or "Click anywhere to continue...")
+    os.pullEvent("mouse_click")
 end
 
--- select menu (arrows + Enter)
+-- select menu (mouse click)
 local function selectMenu(title, options)
-    local selected = 1
     while true do
         header(title)
+        local buttonY = {}
         for i, opt in ipairs(options) do
-            term.setCursorPos(4, 5 + i)
-            if i == selected then
-                term.setTextColor(colors.white)
-                term.write("> " .. opt)
-            else
-                term.setTextColor(colors.lightGray)
-                term.write("  " .. opt)
-            end
+            local y = 5 + i
+            buttonY[i] = y
+            term.setCursorPos(4, y)
+            term.setTextColor(colors.white)
+            term.write("[ " .. opt .. " ]")
         end
-        term.setTextColor(colors.white)
         term.setCursorPos(1, H)
-        term.write("Arrows - select, Enter - confirm")
+        term.write("Click an option to select")
 
-        local _, key = os.pullEvent("key")
-        if key == keys.up then
-            selected = selected - 1
-            if selected < 1 then selected = #options end
-        elseif key == keys.down then
-            selected = selected + 1
-            if selected > #options then selected = 1 end
-        elseif key == keys.enter then
-            return selected, options[selected]
+        local _, _, cx, cy = os.pullEvent("mouse_click")
+        for i, y in ipairs(buttonY) do
+            if cy == y then
+                return i, options[i]
+            end
         end
     end
 end
@@ -123,7 +115,7 @@ header("MoldOS Setup")
 term.write("Welcome to the MoldOS installation wizard.")
 term.setCursorPos(1, 7)
 term.write("You will now be asked a few setup questions.")
-waitKey("Press any key to begin...")
+waitClick("Click anywhere to begin...")
 
 -- ============================================
 --  STEP 2: Language
@@ -176,10 +168,23 @@ term.setCursorPos(1, 8); term.write("Time zone: " .. timezone)
 term.setCursorPos(1, 9); term.write("Username: " .. username)
 term.setCursorPos(1, 10); term.write("Password: " .. (password == "" and "(none)" or string.rep("*", #password)))
 term.setCursorPos(1, 12)
-term.write("Enter - start installation, any other key - cancel")
+term.write("[ Install ]        [ Cancel ]")
 
-local _, key = os.pullEvent("key")
-if key ~= keys.enter then
+local proceed = false
+while true do
+    local _, _, cx, cy = os.pullEvent("mouse_click")
+    if cy == 12 then
+        if cx >= 1 and cx <= 10 then
+            proceed = true
+            break
+        elseif cx >= 20 and cx <= 29 then
+            proceed = false
+            break
+        end
+    end
+end
+
+if not proceed then
     clear()
     print("Installation cancelled.")
     return
@@ -275,7 +280,7 @@ if #failedFiles > 0 then
     term.write("Check that HTTP is enabled on the server")
     term.setCursorPos(1, 6 + #failedFiles + 3)
     term.write("and that REPO_BASE in installer.lua is correct.")
-    waitKey()
+    waitClick()
     return
 end
 
