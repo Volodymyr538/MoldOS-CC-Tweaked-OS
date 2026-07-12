@@ -209,7 +209,7 @@ local config = {
     country = country,
     timezone = timezone,
     osName = "MoldOS",
-    osVersion = "1.0",
+    osVersion = "1.1",
 }
 local cfgFile = fs.open("/os/data/config.lua", "w")
 cfgFile.write(textutils.serialize(config))
