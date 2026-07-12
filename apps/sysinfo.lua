@@ -17,5 +17,5 @@ if total and free then
 end
 
 print("")
-print("Press any key to exit...")
-os.pullEvent("key")
+print("Click anywhere to exit...")
+os.pullEvent("mouse_click")
