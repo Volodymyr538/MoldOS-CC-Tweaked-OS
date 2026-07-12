@@ -1,8 +1,9 @@
 -- MoldOS App: filemanager
--- Mouse-controlled file manager
+-- Mouse-controlled file manager with copy/paste and rename
 
 local W, H = term.getSize()
 local currentPath = "/"
+local clipboard = nil
 
 local function clear()
     term.setBackgroundColor(colors.black)
@@ -32,10 +33,17 @@ local function draw(entries, selectedIdx)
 
     local toolbarY = H
     term.setCursorPos(1, toolbarY)
-    term.write("[New Folder]  [Delete]  [Quit]")
+    term.write("[New][Copy][Paste][Rename][Del][Quit]")
+
+    if clipboard then
+        term.setCursorPos(1, H - 1)
+        term.setTextColor(colors.lightGray)
+        term.write("Clipboard: " .. clipboard.name)
+        term.setTextColor(colors.white)
+    end
 
     local startY = 3
-    local maxVisible = H - 4
+    local maxVisible = H - (clipboard and 5 or 4)
     local rows = {}
 
     for i = 1, math.min(#entries, maxVisible) do
@@ -95,6 +103,55 @@ local function newFolder()
     end
 end
 
+local function renameEntry(name)
+    clear()
+    term.write("Rename '" .. name .. "' to:")
+    term.setCursorPos(1, 3)
+    write("> ")
+    local newName = read()
+    if newName and newName ~= "" and newName ~= name then
+        local oldPath = fs.combine(currentPath, name)
+        local newPath = fs.combine(currentPath, newName)
+        if fs.exists(newPath) then
+            printError("A file with that name already exists.")
+            sleep(1.5)
+        else
+            local ok, err = pcall(fs.move, oldPath, newPath)
+            if not ok then
+                printError("Failed to rename: " .. tostring(err))
+                sleep(1.5)
+            end
+        end
+    end
+end
+
+local function pasteHere()
+    if not clipboard then return end
+    local destPath = fs.combine(currentPath, clipboard.name)
+    if fs.exists(destPath) then
+        clear()
+        term.write("'" .. clipboard.name .. "' already exists here.")
+        term.setCursorPos(1, 3)
+        term.write("Overwrite? [ Yes ]  [ No ]")
+        while true do
+            local _, _, cx, cy = os.pullEvent("mouse_click")
+            if cy == 3 then
+                if cx >= 1 and cx <= 8 then
+                    fs.delete(destPath)
+                    break
+                elseif cx >= 12 and cx <= 18 then
+                    return
+                end
+            end
+        end
+    end
+    local ok, err = pcall(fs.copy, clipboard.path, destPath)
+    if not ok then
+        printError("Failed to paste: " .. tostring(err))
+        sleep(1.5)
+    end
+end
+
 local function main()
     local selected = nil
 
@@ -105,9 +162,21 @@ local function main()
         local _, _, cx, cy = os.pullEvent("mouse_click")
 
         if cy == toolbarY then
-            if cx >= 1 and cx <= 12 then
+            if cx >= 1 and cx <= 5 then
                 newFolder()
-            elseif cx >= 15 and cx <= 22 then
+            elseif cx >= 6 and cx <= 11 then
+                if selected and entries[selected] and entries[selected] ~= ".." then
+                    local name = entries[selected]
+                    clipboard = { path = fs.combine(currentPath, name), name = name }
+                end
+            elseif cx >= 12 and cx <= 18 then
+                pasteHere()
+            elseif cx >= 19 and cx <= 26 then
+                if selected and entries[selected] and entries[selected] ~= ".." then
+                    renameEntry(entries[selected])
+                    selected = nil
+                end
+            elseif cx >= 27 and cx <= 31 then
                 if selected and entries[selected] and entries[selected] ~= ".." then
                     local name = entries[selected]
                     if confirmDelete(name) then
@@ -120,7 +189,7 @@ local function main()
                         selected = nil
                     end
                 end
-            elseif cx >= 25 and cx <= 31 then
+            elseif cx >= 32 and cx <= 37 then
                 break
             end
         else
