@@ -6,10 +6,10 @@
 local REPO_BASE = "https://raw.githubusercontent.com/Volodymyr538/OS/main/"
 
 local FILES_TO_DOWNLOAD = {
-    { url = REPO_BASE .. "os/startup.lua",           path = "/os/startup.lua" },
-    { url = REPO_BASE .. "os/apps/filemanager.lua",  path = "/os/apps/filemanager.lua" },
-    { url = REPO_BASE .. "os/apps/sysinfo.lua",      path = "/os/apps/sysinfo.lua" },
-    { url = REPO_BASE .. "os/apps/calc.lua",         path = "/os/apps/calc.lua" },
+    { url = REPO_BASE .. "os/startup.lua",       path = "/os/startup.lua" },
+    { url = REPO_BASE .. "apps/filemanager.lua", path = "/os/apps/filemanager.lua" },
+    { url = REPO_BASE .. "apps/sysinfo.lua",     path = "/os/apps/sysinfo.lua" },
+    { url = REPO_BASE .. "apps/calc.lua",        path = "/os/apps/calc.lua" },
 }
 
 local W, H = term.getSize()
