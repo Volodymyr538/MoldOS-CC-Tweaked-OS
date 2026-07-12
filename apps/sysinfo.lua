@@ -1,21 +1,21 @@
 -- MoldOS App: sysinfo
--- Показывает информацию о компьютере
+-- Shows information about the computer
 
 term.setTextColor(colors.white)
-print("=== Информация о системе ===")
+print("=== System Information ===")
 print("")
-print("Версия CraftOS: " .. _HOST)
-print("ID компьютера: " .. os.getComputerID())
+print("CraftOS version: " .. _HOST)
+print("Computer ID: " .. os.getComputerID())
 local label = os.getComputerLabel()
-print("Имя компьютера: " .. (label or "(не задано)"))
+print("Computer label: " .. (label or "(not set)"))
 print("")
 
 local total = fs.getCapacity("/")
 local free = fs.getFreeSpace("/")
 if total and free then
-    print("Диск: " .. math.floor(free / 1024) .. " KB свободно из " .. math.floor(total / 1024) .. " KB")
+    print("Disk: " .. math.floor(free / 1024) .. " KB free of " .. math.floor(total / 1024) .. " KB")
 end
 
 print("")
-print("Нажми любую клавишу для выхода...")
+print("Press any key to exit...")
 os.pullEvent("key")
