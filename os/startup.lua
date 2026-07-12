@@ -6,7 +6,7 @@
 local W, H = term.getSize()
 local DATA_DIR = "/os/data"
 local APPS_DIR = "/os/apps"
-local osName, osVersion = "MoldOS", "1.0"
+local osName, osVersion = "MoldOS", "1.1"
 
 -- GitHub repo used for update / install
 local REPO_BASE = "https://raw.githubusercontent.com/Volodymyr538/OS/main/"
