@@ -1,7 +1,7 @@
 -- ============================================
 --  MoldOS - /os/startup.lua
---  Запускается автоматически при включении компьютера
---  (через корневой /startup.lua, который зовёт этот файл)
+--  Runs automatically when the computer starts
+--  (via the root /startup.lua, which calls this file)
 -- ============================================
 
 local W, H = term.getSize()
@@ -9,7 +9,7 @@ local DATA_DIR = "/os/data"
 local APPS_DIR = "/os/apps"
 local osName, osVersion = "MoldOS", "1.0"
 
--- ---------- утилиты интерфейса ----------
+-- ---------- UI helpers ----------
 
 local function clear()
     term.setBackgroundColor(colors.black)
@@ -24,7 +24,7 @@ local function center(y, text)
     term.write(text)
 end
 
--- ---------- загрузка конфигурации и пользователей ----------
+-- ---------- load config and users ----------
 
 local function loadTable(path)
     if not fs.exists(path) then return nil end
@@ -40,13 +40,13 @@ local config = loadTable(DATA_DIR .. "/config.lua") or {}
 local users = loadTable(DATA_DIR .. "/users.lua") or {}
 
 -- ============================================
---  ЭКРАН ЗАПУСКА СИСТЕМЫ
+--  BOOT SCREEN
 -- ============================================
 
 local function bootScreen()
     clear()
     center(math.floor(H / 2) - 1, osName .. " v" .. osVersion)
-    center(math.floor(H / 2) + 1, "Запуск системы...")
+    center(math.floor(H / 2) + 1, "Starting system...")
 
     local barWidth = math.min(W - 4, 30)
     local barX = math.floor((W - barWidth) / 2) + 1
@@ -62,11 +62,10 @@ local function bootScreen()
 end
 
 -- ============================================
---  ЭКРАН ВХОДА
+--  LOGIN SCREEN
 -- ============================================
 
 local function loginScreen()
-    -- если пользователей ещё нет, пропускаем вход
     local anyUser = next(users)
     if not anyUser then
         return "guest"
@@ -75,24 +74,24 @@ local function loginScreen()
     while true do
         clear()
         center(4, osName)
-        center(6, "Вход в систему")
+        center(6, "Login")
         term.setCursorPos(1, 3)
         term.write(string.rep("-", W))
 
         term.setCursorPos(4, 8)
-        term.write("Логин: ")
+        term.write("Username: ")
         local inputUser = read()
 
         local userData = users[inputUser]
         if not userData then
             term.setCursorPos(4, 11)
             term.setTextColor(colors.red)
-            term.write("Пользователь не найден.")
+            term.write("User not found.")
             term.setTextColor(colors.white)
             sleep(1.2)
         else
             term.setCursorPos(4, 9)
-            term.write("Пароль: ")
+            term.write("Password: ")
             local inputPass = read("*")
 
             if userData.password == "" or userData.password == inputPass then
@@ -100,7 +99,7 @@ local function loginScreen()
             else
                 term.setCursorPos(4, 11)
                 term.setTextColor(colors.red)
-                term.write("Неверный пароль.")
+                term.write("Incorrect password.")
                 term.setTextColor(colors.white)
                 sleep(1.2)
             end
@@ -109,7 +108,7 @@ local function loginScreen()
 end
 
 -- ============================================
---  КОНСОЛЬ КОМАНД
+--  COMMAND CONSOLE
 -- ============================================
 
 local currentUser = nil
@@ -117,30 +116,30 @@ local currentUser = nil
 local commands = {}
 
 commands["help"] = function()
-    print("Доступные команды:")
-    print("  help            - список команд")
-    print("  open <прогр>    - запустить программу")
-    print("  list            - список программ")
-    print("  ls              - список файлов текущей папки")
-    print("  clear           - очистить экран")
-    print("  whoami          - показать текущего пользователя")
-    print("  about           - информация о системе")
-    print("  reboot          - перезагрузка")
-    print("  shutdown        - выключение")
-    print("  exit            - выйти в обычный shell CraftOS")
+    print("Available commands:")
+    print("  help            - list commands")
+    print("  open <app>      - run a program")
+    print("  list            - list installed programs")
+    print("  ls              - list files in current folder")
+    print("  clear           - clear the screen")
+    print("  whoami          - show current user")
+    print("  about           - system information")
+    print("  reboot          - reboot")
+    print("  shutdown        - shutdown")
+    print("  exit            - exit to regular CraftOS shell")
 end
 
 commands["list"] = function()
     if not fs.exists(APPS_DIR) then
-        print("Папка приложений не найдена.")
+        print("Apps folder not found.")
         return
     end
     local files = fs.list(APPS_DIR)
     if #files == 0 then
-        print("Приложений не установлено.")
+        print("No apps installed.")
         return
     end
-    print("Установленные приложения:")
+    print("Installed apps:")
     for _, f in ipairs(files) do
         local name = f:gsub("%.lua$", "")
         print("  " .. name)
@@ -150,18 +149,18 @@ end
 commands["open"] = function(args)
     local progName = args[1]
     if not progName then
-        print("Использование: open <название программы>")
+        print("Usage: open <program name>")
         return
     end
     local path = fs.combine(APPS_DIR, progName .. ".lua")
     if not fs.exists(path) then
-        print("Программа '" .. progName .. "' не найдена.")
-        print("Используй 'list' чтобы увидеть доступные программы.")
+        print("Program '" .. progName .. "' not found.")
+        print("Use 'list' to see available programs.")
         return
     end
     local ok, err = pcall(function() shell.run(path) end)
     if not ok then
-        printError("Ошибка запуска: " .. tostring(err))
+        printError("Error running program: " .. tostring(err))
     end
 end
 
@@ -182,9 +181,9 @@ end
 
 commands["about"] = function()
     print(osName .. " v" .. osVersion)
-    print("Язык: " .. tostring(config.language))
-    print("Страна: " .. tostring(config.country))
-    print("Часовой пояс: " .. tostring(config.timezone))
+    print("Language: " .. tostring(config.language))
+    print("Country: " .. tostring(config.country))
+    print("Time zone: " .. tostring(config.timezone))
     print(_HOST)
 end
 
@@ -197,7 +196,7 @@ commands["shutdown"] = function()
 end
 
 commands["exit"] = function()
-    print("Выход в обычный CraftOS shell. Введи 'reboot' чтобы вернуться в " .. osName .. ".")
+    print("Exiting to regular CraftOS shell. Type 'reboot' to return to " .. osName .. ".")
     shell.run("shell")
 end
 
@@ -211,8 +210,8 @@ end
 
 local function consoleLoop()
     clear()
-    print(osName .. " v" .. osVersion .. " - консоль команд")
-    print("Добро пожаловать, " .. currentUser .. "! Введи 'help' для списка команд.")
+    print(osName .. " v" .. osVersion .. " - command console")
+    print("Welcome, " .. currentUser .. "! Type 'help' for a list of commands.")
     print("")
 
     while true do
@@ -230,18 +229,18 @@ local function consoleLoop()
             if cmdFn then
                 local ok, err = pcall(cmdFn, parts)
                 if not ok then
-                    printError("Ошибка: " .. tostring(err))
+                    printError("Error: " .. tostring(err))
                 end
             else
-                print("Неизвестная команда: " .. cmdName)
-                print("Введи 'help' для списка команд.")
+                print("Unknown command: " .. cmdName)
+                print("Type 'help' for a list of commands.")
             end
         end
     end
 end
 
 -- ============================================
---  ЗАПУСК
+--  START
 -- ============================================
 
 if not fs.exists(APPS_DIR) then fs.makeDir(APPS_DIR) end
