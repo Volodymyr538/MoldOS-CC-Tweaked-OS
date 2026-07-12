@@ -32,9 +32,10 @@ local originalTerm = term.current()
 -- wraps term functions so output goes to both computer screen and monitor
 local function mirror(fnName)
     return function(...)
-        local result = { originalTerm[fnName](...) }
+        local args = { ... }
+        local result = { originalTerm[fnName](table.unpack(args)) }
         if monitor then
-            pcall(function() monitor[fnName](...) end)
+            pcall(function() monitor[fnName](table.unpack(args)) end)
         end
         return table.unpack(result)
     end
