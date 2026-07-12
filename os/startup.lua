@@ -1,13 +1,58 @@
 -- ============================================
 --  MoldOS - /os/startup.lua
 --  Runs automatically when the computer starts
---  (via the root /startup.lua, which calls this file)
 -- ============================================
 
 local W, H = term.getSize()
 local DATA_DIR = "/os/data"
 local APPS_DIR = "/os/apps"
 local osName, osVersion = "MoldOS", "1.0"
+
+-- GitHub repo used for update / install
+local REPO_BASE = "https://raw.githubusercontent.com/Volodymyr538/OS/main/"
+local SYSTEM_FILES = {
+    { url = REPO_BASE .. "os/startup.lua", path = "/os/startup.lua" },
+}
+-- registry of installable apps: name -> raw url
+local APP_REGISTRY = {
+    filemanager = REPO_BASE .. "apps/filemanager.lua",
+    sysinfo     = REPO_BASE .. "apps/sysinfo.lua",
+    calc        = REPO_BASE .. "apps/calc.lua",
+}
+
+-- ---------- monitor mirroring ----------
+
+local monitor = peripheral.find("monitor")
+if monitor then
+    monitor.setTextScale(0.5)
+end
+
+local originalTerm = term.current()
+
+-- wraps term functions so output goes to both computer screen and monitor
+local function mirror(fnName)
+    return function(...)
+        local result = { originalTerm[fnName](...) }
+        if monitor then
+            pcall(function() monitor[fnName](...) end)
+        end
+        return table.unpack(result)
+    end
+end
+
+if monitor then
+    local mirrored = {}
+    for _, name in ipairs({
+        "write", "clear", "clearLine", "setCursorPos", "setCursorBlink",
+        "setTextColour", "setTextColor", "setBackgroundColour", "setBackgroundColor",
+        "scroll", "getCursorPos", "getSize", "isColour", "isColor",
+        "getTextColour", "getTextColor", "getBackgroundColour", "getBackgroundColor",
+        "blit",
+    }) do
+        mirrored[name] = mirror(name)
+    end
+    term.redirect(mirrored)
+end
 
 -- ---------- UI helpers ----------
 
@@ -34,6 +79,12 @@ local function loadTable(path)
     local ok, data = pcall(textutils.unserialize, content)
     if ok then return data end
     return nil
+end
+
+local function saveTable(path, tbl)
+    local f = fs.open(path, "w")
+    f.write(textutils.serialize(tbl))
+    f.close()
 end
 
 local config = loadTable(DATA_DIR .. "/config.lua") or {}
@@ -108,12 +159,183 @@ local function loginScreen()
 end
 
 -- ============================================
+--  GREETING (time of day)
+-- ============================================
+
+local function getGreeting()
+    local hour = os.time("ingame")  -- 0.0 to 24.0
+    if hour >= 5 and hour < 12 then
+        return "Good morning"
+    elseif hour >= 12 and hour < 17 then
+        return "Good afternoon"
+    elseif hour >= 17 and hour < 21 then
+        return "Good evening"
+    else
+        return "Good night"
+    end
+end
+
+local function showGreeting(user)
+    clear()
+    center(math.floor(H / 2), getGreeting() .. ", " .. user .. "!")
+    sleep(1.2)
+end
+
+-- ============================================
+--  UPDATE / INSTALL
+-- ============================================
+
+local function downloadFile(url, path)
+    local response = http.get(url)
+    if not response then
+        return false, "failed to fetch " .. url
+    end
+    local content = response.readAll()
+    response.close()
+
+    local dir = fs.getDir(path)
+    if dir ~= "" and not fs.exists(dir) then
+        fs.makeDir(dir)
+    end
+
+    local f = fs.open(path, "w")
+    f.write(content)
+    f.close()
+    return true
+end
+
+local function runUpdate()
+    clear()
+    print("Checking for updates...")
+    print("")
+
+    local anyFailed = false
+    for _, item in ipairs(SYSTEM_FILES) do
+        write(fs.getName(item.path) .. "... ")
+        local ok, err = downloadFile(item.url, item.path)
+        if ok then
+            print("OK")
+        else
+            print("FAILED")
+            anyFailed = true
+        end
+    end
+
+    print("")
+    if anyFailed then
+        print("Some files failed to update. Check your connection.")
+    else
+        print("Update complete! Rebooting...")
+        sleep(1.5)
+        os.reboot()
+    end
+    print("")
+    print("Click anywhere to go back...")
+    os.pullEvent("mouse_click")
+end
+
+local function runInstall()
+    clear()
+    print("=== Install App ===")
+    print("")
+    print("Available apps:")
+    for name in pairs(APP_REGISTRY) do
+        print("  " .. name)
+    end
+    print("")
+    write("Enter app name to install: ")
+    local appName = read()
+
+    local url = APP_REGISTRY[appName]
+    if not url then
+        print("")
+        print("Unknown app: " .. tostring(appName))
+        print("")
+        print("Click anywhere to go back...")
+        os.pullEvent("mouse_click")
+        return
+    end
+
+    print("")
+    print("Installing '" .. appName .. "'...")
+    local path = fs.combine(APPS_DIR, appName .. ".lua")
+    local ok, err = downloadFile(url, path)
+    if ok then
+        print("Installed successfully!")
+    else
+        print("Failed: " .. tostring(err))
+    end
+    print("")
+    print("Click anywhere to go back...")
+    os.pullEvent("mouse_click")
+end
+
+-- ============================================
+--  RENDET (network chat)
+-- ============================================
+
+local function rednetChat()
+    clear()
+    local modem = peripheral.find("modem")
+    if not modem then
+        print("No modem attached to this computer.")
+        print("")
+        print("Click anywhere to go back...")
+        os.pullEvent("mouse_click")
+        return
+    end
+
+    if not rednet.isOpen(peripheral.getName(modem)) then
+        rednet.open(peripheral.getName(modem))
+    end
+
+    print("=== MoldOS Chat ===")
+    print("Your computer ID: " .. os.getComputerID())
+    print("")
+    print("Enter target computer ID (or 'all' to broadcast):")
+    write("> ")
+    local target = read()
+
+    print("Type your message. Type 'exit' to quit chat.")
+    print("")
+
+    local function listenLoop()
+        while true do
+            local senderId, message = rednet.receive("moldos_chat")
+            print("[" .. senderId .. "] " .. tostring(message))
+        end
+    end
+
+    local function sendLoop()
+        while true do
+            write("me> ")
+            local msg = read()
+            if msg == "exit" then
+                return
+            end
+            if target == "all" then
+                rednet.broadcast(msg, "moldos_chat")
+            else
+                local targetId = tonumber(target)
+                if targetId then
+                    rednet.send(targetId, msg, "moldos_chat")
+                else
+                    print("Invalid target ID.")
+                end
+            end
+        end
+    end
+
+    parallel.waitForAny(listenLoop, sendLoop)
+    rednet.close(peripheral.getName(modem))
+end
+
+-- ============================================
 --  APP LIST (click to launch)
 -- ============================================
 
 local currentUser = nil
 
--- built-in system actions shown alongside apps
 local systemActions = {
     { label = "About System",  action = function()
         clear()
@@ -126,6 +348,9 @@ local systemActions = {
         print("Click anywhere to go back...")
         os.pullEvent("mouse_click")
     end },
+    { label = "Network Chat", action = rednetChat },
+    { label = "Check for Updates", action = runUpdate },
+    { label = "Install App", action = runInstall },
     { label = "Reboot",   action = function() os.reboot() end },
     { label = "Shutdown", action = function() os.shutdown() end },
 }
@@ -149,7 +374,7 @@ local function drawMenu(apps)
     clear()
     term.setCursorPos(1, 1)
     term.write(string.rep("=", W))
-    center(2, osName .. " - Welcome, " .. currentUser)
+    center(2, osName .. " - " .. getGreeting() .. ", " .. currentUser)
     term.setCursorPos(1, 3)
     term.write(string.rep("=", W))
 
@@ -226,4 +451,5 @@ if not fs.exists(DATA_DIR) then fs.makeDir(DATA_DIR) end
 
 bootScreen()
 currentUser = loginScreen()
+showGreeting(currentUser)
 menuLoop()
