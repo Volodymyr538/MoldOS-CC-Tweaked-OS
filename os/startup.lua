@@ -108,132 +108,110 @@ local function loginScreen()
 end
 
 -- ============================================
---  COMMAND CONSOLE
+--  APP LIST (click to launch)
 -- ============================================
 
 local currentUser = nil
 
-local commands = {}
+-- built-in system actions shown alongside apps
+local systemActions = {
+    { label = "About System",  action = function()
+        clear()
+        print(osName .. " v" .. osVersion)
+        print("Language: " .. tostring(config.language))
+        print("Country: " .. tostring(config.country))
+        print("Time zone: " .. tostring(config.timezone))
+        print(_HOST)
+        print("")
+        print("Click anywhere to go back...")
+        os.pullEvent("mouse_click")
+    end },
+    { label = "Reboot",   action = function() os.reboot() end },
+    { label = "Shutdown", action = function() os.shutdown() end },
+}
 
-commands["help"] = function()
-    print("Available commands:")
-    print("  help            - list commands")
-    print("  open <app>      - run a program")
-    print("  list            - list installed programs")
-    print("  ls              - list files in current folder")
-    print("  clear           - clear the screen")
-    print("  whoami          - show current user")
-    print("  about           - system information")
-    print("  reboot          - reboot")
-    print("  shutdown        - shutdown")
-    print("  exit            - exit to regular CraftOS shell")
+local function getAppList()
+    local apps = {}
+    if fs.exists(APPS_DIR) then
+        local files = fs.list(APPS_DIR)
+        table.sort(files)
+        for _, f in ipairs(files) do
+            table.insert(apps, {
+                label = f:gsub("%.lua$", ""),
+                path = fs.combine(APPS_DIR, f),
+            })
+        end
+    end
+    return apps
 end
 
-commands["list"] = function()
-    if not fs.exists(APPS_DIR) then
-        print("Apps folder not found.")
-        return
-    end
-    local files = fs.list(APPS_DIR)
-    if #files == 0 then
-        print("No apps installed.")
-        return
-    end
-    print("Installed apps:")
-    for _, f in ipairs(files) do
-        local name = f:gsub("%.lua$", "")
-        print("  " .. name)
-    end
-end
-
-commands["open"] = function(args)
-    local progName = args[1]
-    if not progName then
-        print("Usage: open <program name>")
-        return
-    end
-    local path = fs.combine(APPS_DIR, progName .. ".lua")
-    if not fs.exists(path) then
-        print("Program '" .. progName .. "' not found.")
-        print("Use 'list' to see available programs.")
-        return
-    end
-    local ok, err = pcall(function() shell.run(path) end)
-    if not ok then
-        printError("Error running program: " .. tostring(err))
-    end
-end
-
-commands["ls"] = function()
-    local files = fs.list(shell.dir())
-    for _, f in ipairs(files) do
-        print("  " .. f)
-    end
-end
-
-commands["clear"] = function()
+local function drawMenu(apps)
     clear()
-end
+    term.setCursorPos(1, 1)
+    term.write(string.rep("=", W))
+    center(2, osName .. " - Welcome, " .. currentUser)
+    term.setCursorPos(1, 3)
+    term.write(string.rep("=", W))
 
-commands["whoami"] = function()
-    print(currentUser)
-end
+    local y = 5
+    local rows = {}
 
-commands["about"] = function()
-    print(osName .. " v" .. osVersion)
-    print("Language: " .. tostring(config.language))
-    print("Country: " .. tostring(config.country))
-    print("Time zone: " .. tostring(config.timezone))
-    print(_HOST)
-end
+    term.setCursorPos(4, y)
+    term.setTextColor(colors.yellow)
+    term.write("-- Apps --")
+    term.setTextColor(colors.white)
+    y = y + 1
 
-commands["reboot"] = function()
-    os.reboot()
-end
-
-commands["shutdown"] = function()
-    os.shutdown()
-end
-
-commands["exit"] = function()
-    print("Exiting to regular CraftOS shell. Type 'reboot' to return to " .. osName .. ".")
-    shell.run("shell")
-end
-
-local function splitArgs(line)
-    local parts = {}
-    for word in line:gmatch("%S+") do
-        table.insert(parts, word)
-    end
-    return parts
-end
-
-local function consoleLoop()
-    clear()
-    print(osName .. " v" .. osVersion .. " - command console")
-    print("Welcome, " .. currentUser .. "! Type 'help' for a list of commands.")
-    print("")
-
-    while true do
-        term.setTextColor(colors.lime)
-        write(currentUser .. "@" .. osName:lower() .. "> ")
+    if #apps == 0 then
+        term.setCursorPos(4, y)
+        term.setTextColor(colors.lightGray)
+        term.write("(no apps installed)")
         term.setTextColor(colors.white)
+        y = y + 1
+    else
+        for _, app in ipairs(apps) do
+            term.setCursorPos(4, y)
+            term.write("[ " .. app.label .. " ]")
+            table.insert(rows, { y = y, action = function() shell.run(app.path) end })
+            y = y + 1
+        end
+    end
 
-        local line = read()
-        local parts = splitArgs(line)
-        local cmdName = parts[1]
+    y = y + 1
+    term.setCursorPos(4, y)
+    term.setTextColor(colors.yellow)
+    term.write("-- System --")
+    term.setTextColor(colors.white)
+    y = y + 1
 
-        if cmdName then
-            table.remove(parts, 1)
-            local cmdFn = commands[cmdName]
-            if cmdFn then
-                local ok, err = pcall(cmdFn, parts)
+    for _, item in ipairs(systemActions) do
+        term.setCursorPos(4, y)
+        term.write("[ " .. item.label .. " ]")
+        table.insert(rows, { y = y, action = item.action })
+        y = y + 1
+    end
+
+    return rows
+end
+
+local function menuLoop()
+    while true do
+        local apps = getAppList()
+        local rows = drawMenu(apps)
+
+        local _, _, cx, cy = os.pullEvent("mouse_click")
+        for _, row in ipairs(rows) do
+            if cy == row.y then
+                local ok, err = pcall(row.action)
                 if not ok then
-                    printError("Error: " .. tostring(err))
+                    clear()
+                    print("Error running program:")
+                    print(err)
+                    print("")
+                    print("Click anywhere to go back...")
+                    os.pullEvent("mouse_click")
                 end
-            else
-                print("Unknown command: " .. cmdName)
-                print("Type 'help' for a list of commands.")
+                break
             end
         end
     end
@@ -248,4 +226,4 @@ if not fs.exists(DATA_DIR) then fs.makeDir(DATA_DIR) end
 
 bootScreen()
 currentUser = loginScreen()
-consoleLoop()
+menuLoop()
