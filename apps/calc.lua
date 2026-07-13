@@ -3,9 +3,6 @@
 
 local W, H = term.getSize()
 
-local lang = dofile("/os/lib/lang.lua")
-local t = lang.t
-
 local function clear()
     term.setBackgroundColor(colors.black)
     term.setTextColor(colors.white)
@@ -42,7 +39,7 @@ end
 
 local function draw()
     clear()
-    term.write("=== " .. t("calc_title") .. " ===")
+    term.write("=== MoldOS Calculator ===")
     term.setCursorPos(1, 2)
     term.write(string.rep("-", W))
 
