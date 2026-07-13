@@ -4,6 +4,9 @@
 local W, H = term.getSize()
 local PROTOCOL = "moldos_netshare"
 
+local lang = dofile("/os/lib/lang.lua")
+local t = lang.t
+
 local function clear()
     term.setBackgroundColor(colors.black)
     term.setTextColor(colors.white)
@@ -14,9 +17,9 @@ end
 local modem = peripheral.find("modem")
 if not modem then
     clear()
-    print("No modem attached to this computer.")
+    print(t("no_modem"))
     print("")
-    print("Click anywhere to exit...")
+    print(t("click_exit"))
     os.pullEvent("mouse_click")
     return
 end
@@ -27,7 +30,7 @@ end
 
 local function scanComputers()
     clear()
-    print("Scanning for computers...")
+    print(t("scanning"))
     rednet.broadcast("ping", PROTOCOL .. "_ping")
 
     local found = {}
@@ -56,12 +59,12 @@ end
 
 local function pickFile()
     clear()
-    print("Enter the full path of the file to send:")
+    print(t("enter_file_path"))
     write("> ")
     local path = read()
     if not path or path == "" or not fs.exists(path) or fs.isDir(path) then
         print("")
-        print("File not found.")
+        print(t("file_not_found"))
         sleep(1.5)
         return nil
     end
@@ -80,9 +83,9 @@ local function sendFile(targetId, path)
     rednet.send(targetId, packet, PROTOCOL .. "_file")
 
     clear()
-    print("Sent '" .. packet.name .. "' to computer " .. targetId .. ".")
+    print(t("sent_to") .. " '" .. packet.name .. "' " .. t("to_computer") .. " " .. targetId .. ".")
     print("")
-    print("Click anywhere to continue...")
+    print(t("click_continue"))
     os.pullEvent("mouse_click")
 end
 
@@ -94,15 +97,15 @@ local function sendMenu()
 
     if #ids == 0 then
         clear()
-        print("No other computers found on the network.")
+        print(t("no_computers_found"))
         print("")
-        print("Click anywhere to go back...")
+        print(t("click_exit"))
         os.pullEvent("mouse_click")
         return
     end
 
     clear()
-    print("=== Computers Found ===")
+    print("=== " .. t("computers_found") .. " ===")
     local rows = {}
     local y = 3
     for _, id in ipairs(ids) do
@@ -113,7 +116,7 @@ local function sendMenu()
         y = y + 1
     end
     term.setCursorPos(1, H)
-    term.write("Click a computer to send a file to it")
+    term.write(t("click_computer_send"))
 
     local _, _, cx, cy = os.pullEvent("mouse_click")
     local chosenId = nil
@@ -147,11 +150,11 @@ local function receiveLoop()
             f.close()
 
             clear()
-            print("Received file from computer " .. senderId .. ":")
+            print(t("received_from") .. " " .. senderId .. ":")
             print("  " .. packet.name)
-            print("Saved to: " .. savePath)
+            print(t("saved_to") .. " " .. savePath)
             print("")
-            print("Click anywhere to continue...")
+            print(t("click_continue"))
             os.pullEvent("mouse_click")
         end
     end
@@ -160,13 +163,13 @@ end
 local function mainMenu()
     while true do
         clear()
-        print("=== MoldOS Netshare ===")
-        print("Your computer ID: " .. os.getComputerID())
+        print("=== " .. t("netshare_title") .. " ===")
+        print(t("your_computer_id") .. " " .. os.getComputerID())
         print("")
         term.setCursorPos(4, 5)
-        term.write("[ Send a File ]")
+        term.write("[ " .. t("send_file_btn") .. " ]")
         term.setCursorPos(4, 7)
-        term.write("[ Quit ]")
+        term.write("[ " .. t("quit") .. " ]")
 
         local _, _, cx, cy = os.pullEvent("mouse_click")
         if cy == 5 then
