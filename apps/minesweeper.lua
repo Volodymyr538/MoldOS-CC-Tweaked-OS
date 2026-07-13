@@ -8,9 +8,6 @@ local GRID_W = math.min(W, 25)
 local GRID_H = math.min(H - 1, 12)
 local MINE_COUNT = math.floor(GRID_W * GRID_H * 0.15)
 
-local lang = dofile("/os/lib/lang.lua")
-local t = lang.t
-
 local function clear()
     term.setBackgroundColor(colors.black)
     term.setTextColor(colors.white)
@@ -139,7 +136,7 @@ local function draw()
     end
 
     term.setCursorPos(1, GRID_H + 1)
-    term.write(t("left_click_reveal"))
+    term.write("Left-click: reveal   Right-click: flag")
 end
 
 local function main()
@@ -183,10 +180,10 @@ local function main()
     term.setCursorPos(1, GRID_H + 1)
     if won then
         term.setTextColor(colors.lime)
-        term.write(t("you_win"))
+        term.write("You win! Click anywhere to exit...")
     else
         term.setTextColor(colors.red)
-        term.write(t("boom"))
+        term.write("Boom! Click anywhere to exit...")
     end
     term.setTextColor(colors.white)
     os.pullEvent("mouse_click")
