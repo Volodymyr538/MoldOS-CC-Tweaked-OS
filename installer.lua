@@ -7,7 +7,6 @@ local REPO_BASE = "https://raw.githubusercontent.com/Volodymyr538/OS/main/"
 
 local FILES_TO_DOWNLOAD = {
     { url = REPO_BASE .. "os/startup.lua",       path = "/os/startup.lua" },
-    { url = REPO_BASE .. "lib/lang.lua",         path = "/os/lib/lang.lua" },
     { url = REPO_BASE .. "apps/filemanager.lua", path = "/os/apps/filemanager.lua" },
     { url = REPO_BASE .. "apps/sysinfo.lua",     path = "/os/apps/sysinfo.lua" },
     { url = REPO_BASE .. "apps/calc.lua",        path = "/os/apps/calc.lua" },
@@ -18,86 +17,6 @@ local FILES_TO_DOWNLOAD = {
 }
 
 local W, H = term.getSize()
-
-local installerText = {
-    en = {
-        title = "MoldOS Setup",
-        welcome = "Welcome to the MoldOS installation wizard.",
-        welcome2 = "You will now be asked a few setup questions.",
-        click_begin = "Click anywhere to begin...",
-        select_ui_lang = "Select Interface Language",
-        select_country = "Select Country",
-        select_timezone = "Time Zone",
-        create_profile = "Create Profile",
-        enter_username = "Enter username:",
-        set_password = "Set a password (leave empty for none):",
-        field_empty = "This field cannot be empty!",
-        review = "Review your settings",
-        ui_language = "Interface language:",
-        country = "Country:",
-        timezone = "Time zone:",
-        username = "Username:",
-        password = "Password:",
-        none = "(none)",
-        install = "Install",
-        cancel = "Cancel",
-        cancelled = "Installation cancelled.",
-        installing = "Installing MoldOS",
-        preparing = "Preparing system...",
-        saving = "Saving settings...",
-        creating_account = "Creating user account...",
-        downloading = "Downloading files from GitHub...",
-        finishing = "Finishing installation...",
-        complete = "Installation Complete",
-        success = "MoldOS was installed successfully!",
-        rebooting = "The computer will now reboot.",
-        error_title = "Installation Error",
-        failed_files = "Failed to download files:",
-        check_http = "Check that HTTP is enabled on the server",
-        check_repo = "and that REPO_BASE in installer.lua is correct.",
-    },
-    ru = {
-        title = "Установка MoldOS",
-        welcome = "Добро пожаловать в мастер установки MoldOS.",
-        welcome2 = "Сейчас потребуется задать несколько настроек.",
-        click_begin = "Нажмите в любом месте, чтобы начать...",
-        select_ui_lang = "Выберите язык интерфейса",
-        select_country = "Выбор страны",
-        select_timezone = "Часовой пояс",
-        create_profile = "Создание профиля",
-        enter_username = "Введите имя пользователя:",
-        set_password = "Придумайте пароль (можно оставить пустым):",
-        field_empty = "Поле не может быть пустым!",
-        review = "Проверьте настройки",
-        ui_language = "Язык интерфейса:",
-        country = "Страна:",
-        timezone = "Часовой пояс:",
-        username = "Пользователь:",
-        password = "Пароль:",
-        none = "(не задан)",
-        install = "Установить",
-        cancel = "Отмена",
-        cancelled = "Установка отменена.",
-        installing = "Установка MoldOS",
-        preparing = "Подготовка системы...",
-        saving = "Сохранение настроек...",
-        creating_account = "Создание учётной записи...",
-        downloading = "Скачивание файлов с GitHub...",
-        finishing = "Завершение установки...",
-        complete = "Установка завершена",
-        success = "MoldOS успешно установлена!",
-        rebooting = "Компьютер сейчас перезагрузится.",
-        error_title = "Ошибка установки",
-        failed_files = "Не удалось скачать файлы:",
-        check_http = "Проверьте, что HTTP включён на сервере",
-        check_repo = "и что REPO_BASE в installer.lua указан верно.",
-    },
-}
-
-local uiLang = "en"
-local function t(key)
-    return installerText[uiLang][key] or installerText.en[key] or key
-end
 
 local function clear()
     term.setBackgroundColor(colors.black)
@@ -125,7 +44,7 @@ end
 local function waitClick(msg)
     local _, h = term.getSize()
     term.setCursorPos(1, h)
-    term.write(msg)
+    term.write(msg or "Click anywhere to continue...")
     os.pullEvent("mouse_click")
 end
 
@@ -164,7 +83,7 @@ local function textInput(title, prompt, hideChar, allowEmpty)
         end
         term.setCursorPos(1, 9)
         term.setTextColor(colors.red)
-        term.write(t("field_empty"))
+        term.write("This field cannot be empty!")
         term.setTextColor(colors.white)
         sleep(1)
     end
@@ -187,44 +106,20 @@ local function progressStep(label, y, duration)
 end
 
 -- ============================================
---  STEP 1: Language
+--  STEP 1: Welcome
 -- ============================================
 
-clear()
-center(4, "MoldOS")
-term.setCursorPos(4, 7)
-term.write("[ English ]")
-term.setCursorPos(4, 9)
-term.write("[ Русский ]")
-term.setCursorPos(1, H)
-term.write("Select interface language / Выберите язык интерфейса")
-
-while true do
-    local _, _, cx, cy = os.pullEvent("mouse_click")
-    if cy == 7 then
-        uiLang = "en"
-        break
-    elseif cy == 9 then
-        uiLang = "ru"
-        break
-    end
-end
-
--- ============================================
---  STEP 2: Welcome
--- ============================================
-
-header(t("title"))
-term.write(t("welcome"))
+header("MoldOS Setup")
+term.write("Welcome to the MoldOS installation wizard.")
 term.setCursorPos(1, 7)
-term.write(t("welcome2"))
-waitClick(t("click_begin"))
+term.write("You will now be asked a few setup questions.")
+waitClick("Click anywhere to begin...")
 
 -- ============================================
---  STEP 3: Country
+--  STEP 2: Country
 -- ============================================
 
-local _, country = selectMenu(t("select_country"), {
+local _, country = selectMenu("Select Country", {
     "Moldova",
     "Russia",
     "Ukraine",
@@ -233,10 +128,10 @@ local _, country = selectMenu(t("select_country"), {
 })
 
 -- ============================================
---  STEP 4: Time zone
+--  STEP 3: Time zone
 -- ============================================
 
-local _, timezone = selectMenu(t("select_timezone"), {
+local _, timezone = selectMenu("Time Zone", {
     "UTC+2 (Chisinau)",
     "UTC+3 (Moscow)",
     "UTC+2 (Kyiv)",
@@ -245,33 +140,32 @@ local _, timezone = selectMenu(t("select_timezone"), {
 })
 
 -- ============================================
---  STEP 5: User profile
+--  STEP 4: User profile
 -- ============================================
 
-local username = textInput(t("create_profile"), t("enter_username"), nil, false)
-local password = textInput(t("create_profile"), t("set_password"), "*", true)
+local username = textInput("Create Profile", "Enter username:", nil, false)
+local password = textInput("Create Profile", "Set a password (leave empty for none):", "*", true)
 
 -- ============================================
---  STEP 6: Confirmation
+--  STEP 5: Confirmation
 -- ============================================
 
-header(t("review"))
-term.write(t("ui_language") .. " " .. (uiLang == "ru" and "Русский" or "English"))
-term.setCursorPos(1, 7); term.write(t("country") .. " " .. country)
-term.setCursorPos(1, 8); term.write(t("timezone") .. " " .. timezone)
-term.setCursorPos(1, 9); term.write(t("username") .. " " .. username)
-term.setCursorPos(1, 10); term.write(t("password") .. " " .. (password == "" and t("none") or string.rep("*", #password)))
-term.setCursorPos(1, 12)
-term.write("[ " .. t("install") .. " ]        [ " .. t("cancel") .. " ]")
+header("Review your settings")
+term.write("Country: " .. country)
+term.setCursorPos(1, 7); term.write("Time zone: " .. timezone)
+term.setCursorPos(1, 8); term.write("Username: " .. username)
+term.setCursorPos(1, 9); term.write("Password: " .. (password == "" and "(none)" or string.rep("*", #password)))
+term.setCursorPos(1, 11)
+term.write("[ Install ]        [ Cancel ]")
 
 local proceed = false
 while true do
     local _, _, cx, cy = os.pullEvent("mouse_click")
-    if cy == 12 then
-        if cx >= 1 and cx <= (4 + #t("install")) then
+    if cy == 11 then
+        if cx >= 1 and cx <= 10 then
             proceed = true
             break
-        elseif cx >= 20 and cx <= (24 + #t("cancel")) then
+        elseif cx >= 20 and cx <= 29 then
             proceed = false
             break
         end
@@ -280,40 +174,35 @@ end
 
 if not proceed then
     clear()
-    print(t("cancelled"))
+    print("Installation cancelled.")
     return
 end
 
 -- ============================================
---  STEP 7: Installation
+--  STEP 6: Installation
 -- ============================================
 
-header(t("installing"))
+header("Installing MoldOS")
 
-progressStep(t("preparing"), 5, 0.6)
+progressStep("Preparing system...", 5, 0.6)
 
 if not fs.exists("/os") then fs.makeDir("/os") end
 if not fs.exists("/os/apps") then fs.makeDir("/os/apps") end
-if not fs.exists("/os/lib") then fs.makeDir("/os/lib") end
 if not fs.exists("/os/data") then fs.makeDir("/os/data") end
 
-progressStep(t("saving"), 8, 0.6)
+progressStep("Saving settings...", 8, 0.6)
 
 local config = {
     country = country,
     timezone = timezone,
     osName = "MoldOS",
-    osVersion = "1.3",
+    osVersion = "1.4",
 }
 local cfgFile = fs.open("/os/data/config.lua", "w")
 cfgFile.write(textutils.serialize(config))
 cfgFile.close()
 
-local langFile = fs.open("/os/data/language.lua", "w")
-langFile.write(textutils.serialize(uiLang))
-langFile.close()
-
-progressStep(t("creating_account"), 14, 0.8)
+progressStep("Creating user account...", 14, 0.8)
 
 local users = {}
 users[username] = { password = password }
@@ -321,9 +210,9 @@ local usersFile = fs.open("/os/data/users.lua", "w")
 usersFile.write(textutils.serialize(users))
 usersFile.close()
 
-header(t("installing"))
+header("Installing MoldOS")
 term.setCursorPos(4, 5)
-term.write(t("downloading"))
+term.write("Downloading files from GitHub...")
 
 local downloadY = 7
 local failedFiles = {}
@@ -368,28 +257,28 @@ if not fs.exists("/startup.lua") then
 end
 
 if #failedFiles > 0 then
-    header(t("error_title"))
-    term.write(t("failed_files"))
+    header("Installation Error")
+    term.write("Failed to download files:")
     for i, f in ipairs(failedFiles) do
         term.setCursorPos(4, 6 + i)
         term.write(f)
     end
     term.setCursorPos(1, 6 + #failedFiles + 2)
-    term.write(t("check_http"))
+    term.write("Check that HTTP is enabled on the server")
     term.setCursorPos(1, 6 + #failedFiles + 3)
-    term.write(t("check_repo"))
-    waitClick(t("click_begin"))
+    term.write("and that REPO_BASE in installer.lua is correct.")
+    waitClick()
     return
 end
 
-progressStep(t("finishing"), 20, 0.6)
+progressStep("Finishing installation...", 20, 0.6)
 
 -- ============================================
---  STEP 8: Done
+--  STEP 7: Done
 -- ============================================
 
-header(t("complete"))
-center(6, t("success"))
-center(8, t("rebooting"))
+header("Installation Complete")
+center(6, "MoldOS was installed successfully!")
+center(8, "The computer will now reboot.")
 sleep(2)
 os.reboot()
