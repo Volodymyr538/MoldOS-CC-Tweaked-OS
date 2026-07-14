@@ -21,6 +21,7 @@ local APP_REGISTRY = {
     notes        = REPO_BASE .. "apps/notes.lua",
     snake        = REPO_BASE .. "apps/snake.lua",
     minesweeper  = REPO_BASE .. "apps/minesweeper.lua",
+    textedit     = REPO_BASE .. "apps/textedit.lua",
 }
 
 -- ---------- monitor mirroring ----------
@@ -519,7 +520,7 @@ local function rednetChat()
 end
 
 -- ============================================
---  APP LIST (click to launch)
+--  APP LIST (click to launch) - TABBED
 -- ============================================
 
 local systemActions = {
@@ -557,6 +558,8 @@ local function getAppList()
     return apps
 end
 
+local currentTab = "apps"
+
 local function drawMenu(apps)
     clear()
     term.setCursorPos(1, 1)
@@ -572,51 +575,61 @@ local function drawMenu(apps)
     term.setCursorPos(1, 3)
     term.write(string.rep("=", W))
 
-    local y = 5
-    local rows = {}
-
-    term.setCursorPos(4, y)
-    term.setTextColor(colors.yellow)
-    term.write("-- Apps --")
-    term.setTextColor(colors.white)
-    y = y + 1
-
-    if #apps == 0 then
-        term.setCursorPos(4, y)
+    local tabY = 4
+    term.setCursorPos(2, tabY)
+    if currentTab == "apps" then
+        term.setTextColor(colors.yellow)
+        term.write("[ Apps ]")
         term.setTextColor(colors.lightGray)
-        term.write("(no apps installed)")
-        term.setTextColor(colors.white)
-        y = y + 1
+        term.write("  System")
     else
-        for _, app in ipairs(apps) do
+        term.setTextColor(colors.lightGray)
+        term.write("  Apps  ")
+        term.setTextColor(colors.yellow)
+        term.write("[ System ]")
+    end
+    term.setTextColor(colors.white)
+    term.setCursorPos(1, tabY + 1)
+    term.write(string.rep("-", W))
+
+    local y = tabY + 3
+    local rows = {}
+    local maxY = H - 1
+
+    if currentTab == "apps" then
+        if #apps == 0 then
             term.setCursorPos(4, y)
-            term.write("[ " .. app.label .. " ]")
-            table.insert(rows, { y = y, action = function() shell.run(app.path) end })
-            y = y + 1
+            term.setTextColor(colors.lightGray)
+            term.write("(no apps installed)")
+            term.setTextColor(colors.white)
+        else
+            for _, app in ipairs(apps) do
+                if y <= maxY then
+                    term.setCursorPos(4, y)
+                    term.write("[ " .. app.label .. " ]")
+                    table.insert(rows, { y = y, action = function() shell.run(app.path) end })
+                    y = y + 1
+                end
+            end
+        end
+    else
+        for _, item in ipairs(systemActions) do
+            if y <= maxY then
+                term.setCursorPos(4, y)
+                term.write("[ " .. item.label .. " ]")
+                table.insert(rows, { y = y, action = item.action })
+                y = y + 1
+            end
         end
     end
 
-    y = y + 1
-    term.setCursorPos(4, y)
-    term.setTextColor(colors.yellow)
-    term.write("-- System --")
-    term.setTextColor(colors.white)
-    y = y + 1
-
-    for _, item in ipairs(systemActions) do
-        term.setCursorPos(4, y)
-        term.write("[ " .. item.label .. " ]")
-        table.insert(rows, { y = y, action = item.action })
-        y = y + 1
-    end
-
-    return rows
+    return rows, tabY
 end
 
 local function menuLoop()
     while true do
         local apps = getAppList()
-        local rows = drawMenu(apps)
+        local rows, tabY = drawMenu(apps)
 
         local timerId = os.startTimer(1)
         local clicked = false
@@ -637,18 +650,26 @@ local function menuLoop()
             end
         end
 
-        for _, row in ipairs(rows) do
-            if cy == row.y then
-                local ok, err = pcall(row.action)
-                if not ok then
-                    clear()
-                    print("Error running program:")
-                    print(err)
-                    print("")
-                    print("Click anywhere to go back...")
-                    os.pullEvent("mouse_click")
+        if cy == tabY then
+            if cx >= 1 and cx <= 9 then
+                currentTab = "apps"
+            elseif cx >= 10 and cx <= 20 then
+                currentTab = "system"
+            end
+        else
+            for _, row in ipairs(rows) do
+                if cy == row.y then
+                    local ok, err = pcall(row.action)
+                    if not ok then
+                        clear()
+                        print("Error running program:")
+                        print(err)
+                        print("")
+                        print("Click anywhere to go back...")
+                        os.pullEvent("mouse_click")
+                    end
+                    break
                 end
-                break
             end
         end
     end
