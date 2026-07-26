@@ -21,7 +21,6 @@ local APP_REGISTRY = {
     notes        = REPO_BASE .. "apps/notes.lua",
     snake        = REPO_BASE .. "apps/snake.lua",
     minesweeper  = REPO_BASE .. "apps/minesweeper.lua",
-    textedit     = REPO_BASE .. "apps/textedit.lua",
 }
 
 -- ---------- monitor mirroring ----------
@@ -117,7 +116,7 @@ local function bootScreen()
 end
 
 -- ============================================
---  LOGIN SCREEN (click your account, then type password)
+--  LOGIN SCREEN (click your account; password screen skipped if none is set)
 -- ============================================
 
 local function loginScreen()
@@ -158,6 +157,13 @@ local function loginScreen()
 
         if chosen then
             local userData = users[chosen]
+
+            -- FIX: if this account has no password set, log straight in
+            -- without showing a password prompt at all.
+            if userData.password == "" then
+                return chosen
+            end
+
             while true do
                 clear()
                 center(3, osName)
@@ -169,7 +175,7 @@ local function loginScreen()
                 term.write("Password: ")
                 local inputPass = read("*")
 
-                if userData.password == "" or userData.password == inputPass then
+                if userData.password == inputPass then
                     return chosen
                 else
                     term.setCursorPos(4, 10)
@@ -267,6 +273,17 @@ local function runUpdate()
     os.pullEvent("mouse_click")
 end
 
+local function findAppInRegistry(name)
+    if not name then return nil, nil end
+    local trimmed = name:match("^%s*(.-)%s*$"):lower()
+    for key, url in pairs(APP_REGISTRY) do
+        if key:lower() == trimmed then
+            return key, url
+        end
+    end
+    return nil, nil
+end
+
 local function runInstall()
     clear()
     print("=== Install App ===")
@@ -277,12 +294,12 @@ local function runInstall()
     end
     print("")
     write("Enter app name to install: ")
-    local appName = read()
+    local appNameInput = read()
 
-    local url = APP_REGISTRY[appName]
+    local appName, url = findAppInRegistry(appNameInput)
     if not url then
         print("")
-        print("Unknown app: " .. tostring(appName))
+        print("Unknown app: " .. tostring(appNameInput))
         print("")
         print("Click anywhere to go back...")
         os.pullEvent("mouse_click")
@@ -389,6 +406,12 @@ local function createUser()
     sleep(1.2)
 end
 
+local function countUsers()
+    local n = 0
+    for _ in pairs(users) do n = n + 1 end
+    return n
+end
+
 local function deleteUser()
     clear()
     print("=== Delete a User ===")
@@ -409,6 +432,12 @@ local function deleteUser()
     if not users[targetName] then
         print("")
         print("User not found.")
+        sleep(1.5)
+        return
+    end
+    if countUsers() <= 1 then
+        print("")
+        print("You cannot delete the last remaining user.")
         sleep(1.5)
         return
     end
@@ -549,10 +578,12 @@ local function getAppList()
         local files = fs.list(APPS_DIR)
         table.sort(files)
         for _, f in ipairs(files) do
-            table.insert(apps, {
-                label = f:gsub("%.lua$", ""),
-                path = fs.combine(APPS_DIR, f),
-            })
+            if f:match("%.lua$") and not fs.isDir(fs.combine(APPS_DIR, f)) then
+                table.insert(apps, {
+                    label = f:gsub("%.lua$", ""),
+                    path = fs.combine(APPS_DIR, f),
+                })
+            end
         end
     end
     return apps
@@ -649,6 +680,8 @@ local function menuLoop()
                 timerId = os.startTimer(1)
             end
         end
+
+        os.cancelTimer(timerId)
 
         if cy == tabY then
             if cx >= 1 and cx <= 9 then
