@@ -1,75 +1,15 @@
 -- MoldOS App: antivirus
--- Scans Lua files for suspicious patterns (not a real virus scanner,
--- pattern-based heuristics only). Can scan a single file (used by the
--- installer before running new apps) or the whole computer.
+-- User-facing scanner UI. The actual scanning rules live in
+-- /os/lib/avcore.lua, shared with installer.lua.
 
 local W, H = term.getSize()
+local av = dofile("/os/lib/avcore.lua")
 
 local function clear()
     term.setBackgroundColor(colors.black)
     term.setTextColor(colors.white)
     term.clear()
     term.setCursorPos(1, 1)
-end
-
-local RULES = {
-    { pattern = "fs%.delete%s*%(%s*[\"']/%s*[\"']",       severity = "critical", desc = "Attempts to delete the root filesystem" },
-    { pattern = "fs%.delete%s*%(%s*[\"']/os",              severity = "critical", desc = "Attempts to delete core system files" },
-    { pattern = "disk%.format",                            severity = "high",     desc = "Formats a disk (destroys its contents)" },
-    { pattern = "rednet%.broadcast.-http",                 severity = "high",     desc = "Broadcasts data possibly combined with a web request" },
-    { pattern = "http%.post",                              severity = "medium",   desc = "Sends data to an external website" },
-    { pattern = "http%.request",                           severity = "medium",   desc = "Makes a raw network request" },
-    { pattern = "shell%.run%s*%(.-shell%.run",             severity = "medium",   desc = "Nested shell.run calls (possible fork-bomb pattern)" },
-    { pattern = "while%s+true%s+do%s*shell%.run",          severity = "high",     desc = "Infinite loop repeatedly launching programs (fork-bomb risk)" },
-    { pattern = "fs%.list%s*%(%s*[\"']/[\"']%s*%).-http",  severity = "high",     desc = "Reads the whole filesystem and appears to send it over the network" },
-    { pattern = "os%.getComputerLabel.-http",              severity = "low",      desc = "Reads computer identity info near a network call" },
-    { pattern = "%[%[.-%]%]",                               severity = "low",      desc = "Contains a long raw string block (could hide obfuscated code)" },
-    { pattern = "loadstring%s*%(",                          severity = "medium",   desc = "Dynamically loads and executes code from a string" },
-    { pattern = "load%s*%(.-http",                          severity = "critical", desc = "Downloads and executes code from the internet at runtime" },
-}
-
-local SEVERITY_ORDER = { critical = 4, high = 3, medium = 2, low = 1 }
-local SEVERITY_COLOR = {
-    critical = colors.red, high = colors.orange,
-    medium = colors.yellow, low = colors.lightGray,
-}
-
-local function scanFile(path)
-    if not fs.exists(path) or fs.isDir(path) then
-        return nil, "not a file"
-    end
-
-    local f = fs.open(path, "r")
-    local content = f.readAll()
-    f.close()
-
-    local findings = {}
-    for _, rule in ipairs(RULES) do
-        if content:find(rule.pattern) then
-            table.insert(findings, rule)
-        end
-    end
-
-    table.sort(findings, function(a, b)
-        return SEVERITY_ORDER[a.severity] > SEVERITY_ORDER[b.severity]
-    end)
-
-    return findings
-end
-
-local function isFileSafe(path)
-    local findings = scanFile(path)
-    if not findings then return true end
-    for _, f in ipairs(findings) do
-        if f.severity == "critical" or f.severity == "high" then
-            return false
-        end
-    end
-    return true
-end
-
-if ... == "lib" then
-    return { scanFile = scanFile, isFileSafe = isFileSafe }
 end
 
 local function showFileReport(path, findings)
@@ -88,7 +28,7 @@ local function showFileReport(path, findings)
         for _, f in ipairs(findings) do
             if y > H - 2 then break end
             term.setCursorPos(2, y)
-            term.setTextColor(SEVERITY_COLOR[f.severity])
+            term.setTextColor(av.SEVERITY_COLOR[f.severity])
             term.write("[" .. f.severity:upper() .. "] ")
             term.setTextColor(colors.white)
             term.write(f.desc)
@@ -119,22 +59,8 @@ local function scanSingleFile()
         return
     end
 
-    local findings = scanFile(path)
+    local findings = av.scanFile(path)
     showFileReport(path, findings)
-end
-
-local function collectLuaFiles(dir, out)
-    out = out or {}
-    if not fs.exists(dir) then return out end
-    for _, name in ipairs(fs.list(dir)) do
-        local path = fs.combine(dir, name)
-        if fs.isDir(path) then
-            collectLuaFiles(path, out)
-        elseif name:match("%.lua$") then
-            table.insert(out, path)
-        end
-    end
-    return out
 end
 
 local function fullSystemScan()
@@ -142,8 +68,7 @@ local function fullSystemScan()
     print("Scanning /os/apps and root for .lua files...")
     print("")
 
-    local files = {}
-    collectLuaFiles("/os/apps", files)
+    local files = av.collectLuaFiles("/os/apps", {})
     for _, name in ipairs(fs.list("/")) do
         if name:match("%.lua$") and not fs.isDir(fs.combine("/", name)) then
             table.insert(files, fs.combine("/", name))
@@ -154,7 +79,7 @@ local function fullSystemScan()
     local flaggedCount = 0
     for _, path in ipairs(files) do
         write(fs.getName(path) .. "... ")
-        local findings = scanFile(path)
+        local findings = av.scanFile(path)
         if findings and #findings > 0 then
             local worst = findings[1].severity
             print(worst:upper())
@@ -171,7 +96,7 @@ local function fullSystemScan()
     print("Click anywhere to view details, or wait to return...")
 
     local timer = os.startTimer(4)
-    local event, p1 = os.pullEvent()
+    local event = os.pullEvent()
     if event == "mouse_click" then
         for _, r in ipairs(results) do
             if r.findings and #r.findings > 0 then
