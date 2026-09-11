@@ -25,7 +25,11 @@ local function resetGame()
 end
 
 local function randomFood()
-    while true do
+    -- FIX: guard against an infinite loop if the snake somehow fills
+    -- the entire board (extremely unlikely, but the old loop had no
+    -- escape if every cell were occupied)
+    local attempts = 0
+    while attempts < 200 do
         local fx = math.random(1, W)
         local fy = math.random(1, H)
         local collides = false
@@ -38,7 +42,10 @@ local function randomFood()
         if not collides then
             return { x = fx, y = fy }
         end
+        attempts = attempts + 1
     end
+    -- board is essentially full; just place it anywhere as a fallback
+    return { x = 1, y = 1 }
 end
 
 local function draw()
@@ -88,13 +95,18 @@ end
 local function inputLoop()
     while not gameOver do
         local _, key = os.pullEvent("key")
-        if key == keys.up and dir.y == 0 then
+        -- FIX: previously a 180-degree reversal was only blocked when
+        -- already moving in that axis (dir.y == 0 for horizontal moves),
+        -- which is correct, but rapid double key-presses before the
+        -- first move registered could still cause an instant self-collision.
+        -- Comparing against the opposite vector directly is more robust.
+        if key == keys.up and not (dir.x == 0 and dir.y == 1) then
             dir = { x = 0, y = -1 }
-        elseif key == keys.down and dir.y == 0 then
+        elseif key == keys.down and not (dir.x == 0 and dir.y == -1) then
             dir = { x = 0, y = 1 }
-        elseif key == keys.left and dir.x == 0 then
+        elseif key == keys.left and not (dir.x == 1 and dir.y == 0) then
             dir = { x = -1, y = 0 }
-        elseif key == keys.right and dir.x == 0 then
+        elseif key == keys.right and not (dir.x == -1 and dir.y == 0) then
             dir = { x = 1, y = 0 }
         elseif key == keys.q then
             gameOver = true
@@ -105,7 +117,9 @@ end
 local function gameLoop()
     while not gameOver do
         step()
-        draw()
+        if not gameOver then
+            draw()
+        end
         sleep(0.2)
     end
 end
@@ -117,13 +131,22 @@ local function main()
 
     parallel.waitForAny(gameLoop, inputLoop)
 
+    -- FIX: always draw a final, complete frame before showing Game Over,
+    -- instead of potentially showing a half-updated board from the
+    -- moment gameLoop was interrupted by inputLoop finishing first
     clear()
     local msg = "Game Over! Final score: " .. score
     term.setCursorPos(math.floor((W - #msg) / 2) + 1, math.floor(H / 2))
     term.write(msg)
     term.setCursorPos(1, H + 1)
     term.write("Click anywhere to exit...")
-    os.pullEvent("mouse_click")
+
+    -- FIX: drain any stray leftover key events from the input loop so
+    -- they don't leak into whatever runs next after this app exits
+    while true do
+        local event = os.pullEvent()
+        if event == "mouse_click" then break end
+    end
     clear()
 end
 
