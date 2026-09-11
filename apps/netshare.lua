@@ -3,6 +3,7 @@
 
 local W, H = term.getSize()
 local PROTOCOL = "moldos_netshare"
+local MAX_FILE_SIZE = 32 * 1024 -- 32KB soft cap to keep transfers reliable
 
 local function clear()
     term.setBackgroundColor(colors.black)
@@ -65,6 +66,20 @@ local function pickFile()
         sleep(1.5)
         return nil
     end
+
+    -- FIX: warn (rather than silently fail mid-transfer) when a file is
+    -- too large to send reliably over rednet
+    local size = fs.getSize(path)
+    if size > MAX_FILE_SIZE then
+        print("")
+        print("This file is " .. math.floor(size / 1024) .. "KB, which is")
+        print("larger than the " .. (MAX_FILE_SIZE / 1024) .. "KB limit for reliable transfer.")
+        print("")
+        print("Click anywhere to cancel...")
+        os.pullEvent("mouse_click")
+        return nil
+    end
+
     return path
 end
 
@@ -136,10 +151,15 @@ local function receiveLoop()
     while true do
         local senderId, packet, protocol = rednet.receive(PROTOCOL .. "_file")
         if type(packet) == "table" and packet.name and packet.content then
-            local savePath = fs.combine("/", packet.name)
+            -- FIX: sanitize the incoming filename so a malicious sender
+            -- can't use '/' or '..' to write outside the intended folder
+            local safeName = packet.name:gsub("[/\\]", "_")
+            if safeName == "" then safeName = "received_file" end
+
+            local savePath = fs.combine("/", safeName)
             local counter = 1
             while fs.exists(savePath) do
-                savePath = fs.combine("/", counter .. "_" .. packet.name)
+                savePath = fs.combine("/", counter .. "_" .. safeName)
                 counter = counter + 1
             end
             local f = fs.open(savePath, "w")
@@ -148,7 +168,7 @@ local function receiveLoop()
 
             clear()
             print("Received file from computer " .. senderId .. ":")
-            print("  " .. packet.name)
+            print("  " .. safeName)
             print("Saved to: " .. savePath)
             print("")
             print("Click anywhere to continue...")
