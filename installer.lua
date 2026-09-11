@@ -14,9 +14,12 @@ local FILES_TO_DOWNLOAD = {
     { url = REPO_BASE .. "apps/notes.lua",       path = "/os/apps/notes.lua" },
     { url = REPO_BASE .. "apps/snake.lua",       path = "/os/apps/snake.lua" },
     { url = REPO_BASE .. "apps/minesweeper.lua", path = "/os/apps/minesweeper.lua" },
+    { url = REPO_BASE .. "apps/antivirus.lua",   path = "/os/apps/antivirus.lua" },
 }
 
 local W, H = term.getSize()
+
+local LOCK_FILE = "/os/data/.install_lock"
 
 local function clear()
     term.setBackgroundColor(colors.black)
@@ -46,6 +49,43 @@ local function waitClick(msg)
     term.setCursorPos(1, h)
     term.write(msg or "Click anywhere to continue...")
     os.pullEvent("mouse_click")
+end
+
+-- ---------- re-run protection ----------
+
+if fs.exists(LOCK_FILE) then
+    header("MoldOS Already Installing")
+    term.write("A MoldOS installation is already in progress")
+    term.setCursorPos(1, 7)
+    term.write("or was left incomplete on this computer.")
+    term.setCursorPos(1, 9)
+    term.write("[ Continue Anyway ]     [ Cancel ]")
+
+    local proceed = false
+    while true do
+        local _, _, cx, cy = os.pullEvent("mouse_click")
+        if cy == 9 then
+            if cx >= 1 and cx <= 19 then
+                proceed = true
+                break
+            elseif cx >= 25 and cx <= 33 then
+                break
+            end
+        end
+    end
+
+    if not proceed then
+        clear()
+        print("Installation cancelled.")
+        return
+    end
+end
+
+if not fs.exists("/os/data") then fs.makeDir("/os/data") end
+do
+    local f = fs.open(LOCK_FILE, "w")
+    f.write(tostring(os.epoch("utc")))
+    f.close()
 end
 
 local function selectMenu(title, options)
@@ -144,7 +184,6 @@ local _, timezone = selectMenu("Time Zone", {
 -- ============================================
 
 local username = textInput("Create Profile", "Enter username:", nil, false)
-local password = textInput("Create Profile", "Set a password (leave empty for none):", "*", true)
 
 -- ============================================
 --  STEP 5: Confirmation
@@ -154,7 +193,7 @@ header("Review your settings")
 term.write("Country: " .. country)
 term.setCursorPos(1, 7); term.write("Time zone: " .. timezone)
 term.setCursorPos(1, 8); term.write("Username: " .. username)
-term.setCursorPos(1, 9); term.write("Password: " .. (password == "" and "(none)" or string.rep("*", #password)))
+term.setCursorPos(1, 9); term.write("PIN: (set later in Settings)")
 term.setCursorPos(1, 11)
 term.write("[ Install ]        [ Cancel ]")
 
@@ -175,6 +214,7 @@ end
 if not proceed then
     clear()
     print("Installation cancelled.")
+    fs.delete(LOCK_FILE)
     return
 end
 
@@ -196,7 +236,7 @@ local config = {
     country = country,
     timezone = timezone,
     osName = "MoldOS",
-    osVersion = "1.2",
+    osVersion = "1.3",
 }
 local cfgFile = fs.open("/os/data/config.lua", "w")
 cfgFile.write(textutils.serialize(config))
@@ -205,7 +245,7 @@ cfgFile.close()
 progressStep("Creating user account...", 14, 0.8)
 
 local users = {}
-users[username] = { password = password }
+users[username] = { pin = "" }
 local usersFile = fs.open("/os/data/users.lua", "w")
 usersFile.write(textutils.serialize(users))
 usersFile.close()
@@ -216,6 +256,7 @@ term.write("Downloading files from GitHub...")
 
 local downloadY = 7
 local failedFiles = {}
+local downloadedPaths = {}
 
 for i, item in ipairs(FILES_TO_DOWNLOAD) do
     term.setCursorPos(4, downloadY + i - 1)
@@ -234,6 +275,8 @@ for i, item in ipairs(FILES_TO_DOWNLOAD) do
         local f = fs.open(item.path, "w")
         f.write(content)
         f.close()
+
+        table.insert(downloadedPaths, item.path)
 
         term.setCursorPos(W - 6, downloadY + i - 1)
         term.setTextColor(colors.lime)
@@ -268,7 +311,78 @@ if #failedFiles > 0 then
     term.setCursorPos(1, 6 + #failedFiles + 3)
     term.write("and that REPO_BASE in installer.lua is correct.")
     waitClick()
+    fs.delete(LOCK_FILE)
     return
+end
+
+-- ============================================
+--  STEP 6.5: Antivirus scan of downloaded files
+-- ============================================
+
+header("Scanning Downloaded Files")
+term.setCursorPos(4, 5)
+term.write("Running a quick safety check...")
+
+local DANGEROUS_PATTERNS = {
+    "fs%.delete%s*%(%s*[\"']/%s*[\"']",
+    "fs%.delete%s*%(%s*[\"']/os",
+    "disk%.format",
+    "load%s*%(.-http",
+}
+
+local flaggedFiles = {}
+local scanY = 7
+for _, path in ipairs(downloadedPaths) do
+    if path:match("%.lua$") then
+        term.setCursorPos(4, scanY)
+        term.write(fs.getName(path) .. "...")
+        local f = fs.open(path, "r")
+        local content = f.readAll()
+        f.close()
+
+        local flagged = false
+        for _, pattern in ipairs(DANGEROUS_PATTERNS) do
+            if content:find(pattern) then
+                flagged = true
+                break
+            end
+        end
+
+        if flagged then
+            term.setCursorPos(W - 10, scanY)
+            term.setTextColor(colors.red)
+            term.write("FLAGGED")
+            term.setTextColor(colors.white)
+            table.insert(flaggedFiles, path)
+        else
+            term.setCursorPos(W - 4, scanY)
+            term.setTextColor(colors.lime)
+            term.write("OK")
+            term.setTextColor(colors.white)
+        end
+        scanY = scanY + 1
+        if scanY > H - 3 then scanY = H - 3 end
+    end
+end
+
+sleep(0.5)
+
+if #flaggedFiles > 0 then
+    header("Warning: Suspicious Files")
+    term.write("The following files contain patterns")
+    term.setCursorPos(1, 7)
+    term.write("that are unusual for a normal MoldOS install:")
+    for i, path in ipairs(flaggedFiles) do
+        term.setCursorPos(4, 8 + i)
+        term.setTextColor(colors.orange)
+        term.write(path)
+        term.setTextColor(colors.white)
+    end
+    term.setCursorPos(1, 8 + #flaggedFiles + 2)
+    term.write("This is expected for antivirus.lua itself, since it")
+    term.setCursorPos(1, 8 + #flaggedFiles + 3)
+    term.write("contains these patterns as detection signatures.")
+    waitClick()
 end
 
 progressStep("Finishing installation...", 20, 0.6)
@@ -277,8 +391,11 @@ progressStep("Finishing installation...", 20, 0.6)
 --  STEP 7: Done
 -- ============================================
 
+fs.delete(LOCK_FILE)
+
 header("Installation Complete")
 center(6, "MoldOS was installed successfully!")
-center(8, "The computer will now reboot.")
+center(7, "Set a PIN anytime from Settings.")
+center(9, "The computer will now reboot.")
 sleep(2)
 os.reboot()
