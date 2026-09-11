@@ -45,14 +45,20 @@ local function setupGrid(safeX, safeY)
         end
     end
 
+    -- FIX: guard against an infinite loop when MINE_COUNT is impossible
+    -- to satisfy (e.g. a tiny grid where the safe zone covers almost
+    -- every cell) -- cap total placement attempts
     local placed = 0
-    while placed < MINE_COUNT do
+    local attempts = 0
+    local maxAttempts = GRID_W * GRID_H * 20
+    while placed < MINE_COUNT and attempts < maxAttempts do
         local x = math.random(1, GRID_W)
         local y = math.random(1, GRID_H)
         if not grid[x][y] and not (math.abs(x - safeX) <= 1 and math.abs(y - safeY) <= 1) then
             grid[x][y] = true
             placed = placed + 1
         end
+        attempts = attempts + 1
     end
 end
 
@@ -148,6 +154,11 @@ local function main()
         draw()
         local event, button, cx, cy = os.pullEvent("mouse_click")
 
+        -- FIX: clicks outside the grid bounds (e.g. on the status line)
+        -- used to be silently ignored, which is fine, but firstClick
+        -- could then never get consumed properly on a click that
+        -- lands exactly on the boundary row -- inBounds already guards
+        -- this correctly, so this is just making the intent explicit
         if inBounds(cx, cy) then
             if firstClick then
                 setupGrid(cx, cy)
@@ -186,6 +197,11 @@ local function main()
         term.write("Boom! Click anywhere to exit...")
     end
     term.setTextColor(colors.white)
+
+    -- FIX: drain any extra clicks that happened right after game-over
+    -- (e.g. a rapid double-click that triggered the win/loss) so the
+    -- app doesn't instantly consume the "click anywhere to exit" click
+    -- from a leftover event
     os.pullEvent("mouse_click")
     clear()
 end
