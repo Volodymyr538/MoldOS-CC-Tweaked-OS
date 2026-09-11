@@ -39,7 +39,16 @@ local function newNote()
     print("New note title:")
     write("> ")
     local title = read()
-    if not title or title == "" then return end
+
+    -- FIX: reject empty titles and titles containing '/', which would
+    -- otherwise create a file outside of NOTES_DIR via fs.combine
+    if not title or title:match("^%s*$") then return end
+    if title:find("/") then
+        clear()
+        print("Note title cannot contain '/'.")
+        sleep(1.5)
+        return
+    end
 
     local path = fs.combine(NOTES_DIR, title)
     if fs.exists(path) then
