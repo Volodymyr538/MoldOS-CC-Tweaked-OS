@@ -7,6 +7,7 @@ local REPO_BASE = "https://raw.githubusercontent.com/Volodymyr538/OS/main/"
 
 local FILES_TO_DOWNLOAD = {
     { url = REPO_BASE .. "os/startup.lua",       path = "/os/startup.lua" },
+    { url = REPO_BASE .. "lib/avcore.lua",       path = "/os/lib/avcore.lua" },
     { url = REPO_BASE .. "apps/filemanager.lua", path = "/os/apps/filemanager.lua" },
     { url = REPO_BASE .. "apps/sysinfo.lua",     path = "/os/apps/sysinfo.lua" },
     { url = REPO_BASE .. "apps/calc.lua",        path = "/os/apps/calc.lua" },
@@ -323,12 +324,7 @@ header("Scanning Downloaded Files")
 term.setCursorPos(4, 5)
 term.write("Running a quick safety check...")
 
-local DANGEROUS_PATTERNS = {
-    "fs%.delete%s*%(%s*[\"']/%s*[\"']",
-    "fs%.delete%s*%(%s*[\"']/os",
-    "disk%.format",
-    "load%s*%(.-http",
-}
+local av = dofile("/os/lib/avcore.lua")
 
 local flaggedFiles = {}
 local scanY = 7
@@ -336,19 +332,10 @@ for _, path in ipairs(downloadedPaths) do
     if path:match("%.lua$") then
         term.setCursorPos(4, scanY)
         term.write(fs.getName(path) .. "...")
-        local f = fs.open(path, "r")
-        local content = f.readAll()
-        f.close()
 
-        local flagged = false
-        for _, pattern in ipairs(DANGEROUS_PATTERNS) do
-            if content:find(pattern) then
-                flagged = true
-                break
-            end
-        end
+        local isSafe = av.isFileSafe(path)
 
-        if flagged then
+        if not isSafe then
             term.setCursorPos(W - 10, scanY)
             term.setTextColor(colors.red)
             term.write("FLAGGED")
@@ -379,9 +366,9 @@ if #flaggedFiles > 0 then
         term.setTextColor(colors.white)
     end
     term.setCursorPos(1, 8 + #flaggedFiles + 2)
-    term.write("This is expected for antivirus.lua itself, since it")
+    term.write("This is expected for antivirus.lua/avcore.lua, since they")
     term.setCursorPos(1, 8 + #flaggedFiles + 3)
-    term.write("contains these patterns as detection signatures.")
+    term.write("contain these patterns as detection signatures.")
     waitClick()
 end
 
