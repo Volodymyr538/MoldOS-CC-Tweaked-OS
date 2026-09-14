@@ -13,7 +13,6 @@ local SYSTEM_FILES = {
     { url = REPO_BASE .. "os/startup.lua", path = "/os/startup.lua" },
     { url = REPO_BASE .. "lib/avcore.lua", path = "/os/lib/avcore.lua" },
 }
-}
 local APP_REGISTRY = {
     filemanager  = REPO_BASE .. "apps/filemanager.lua",
     sysinfo      = REPO_BASE .. "apps/sysinfo.lua",
