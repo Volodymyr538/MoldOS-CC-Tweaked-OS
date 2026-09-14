@@ -11,6 +11,8 @@ local osName, osVersion = "MoldOS", "1.3"
 local REPO_BASE = "https://raw.githubusercontent.com/Volodymyr538/OS/main/"
 local SYSTEM_FILES = {
     { url = REPO_BASE .. "os/startup.lua", path = "/os/startup.lua" },
+    { url = REPO_BASE .. "lib/avcore.lua", path = "/os/lib/avcore.lua" },
+}
 }
 local APP_REGISTRY = {
     filemanager  = REPO_BASE .. "apps/filemanager.lua",
