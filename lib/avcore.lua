@@ -26,9 +26,6 @@ local SEVERITY_COLOR = {
     medium = colors.yellow, low = colors.lightGray,
 }
 
--- Scans a single file's contents and returns a list of matched rules,
--- sorted from most to least severe. Returns nil if the path doesn't
--- point at a readable file.
 local function scanFile(path)
     if not fs.exists(path) or fs.isDir(path) then
         return nil
@@ -52,8 +49,6 @@ local function scanFile(path)
     return findings
 end
 
--- Convenience check: true if the file has no "critical" or "high"
--- findings (i.e. safe enough to run without an explicit warning).
 local function isFileSafe(path)
     local findings = scanFile(path)
     if not findings then return true end
@@ -65,7 +60,6 @@ local function isFileSafe(path)
     return true
 end
 
--- Recursively collects every .lua file under a directory into `out`.
 local function collectLuaFiles(dir, out)
     out = out or {}
     if not fs.exists(dir) then return out end
